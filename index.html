@@ -207,6 +207,8 @@
         .btn-primary:hover { background: var(--accent-hover); }
         .btn-stop { background: var(--danger); }
         .btn-secondary { background: #475569; }
+        .btn-shuffle { background: #8b5cf6; } /* Fialové tlačítko míchání */
+        .btn-shuffle:hover { background: #7c3aed; }
 
         .settings-box {
             display: flex;
@@ -411,13 +413,12 @@
             </div>
         </div>
 
-        <!-- REŽIM 3: PAMĚŤ – VŠECHNY BARVY NAJEDNOU (PLNĚ NÁHODNĚ ZAMÍCHANÉ) -->
+        <!-- REŽIM 3: PAMĚŤ – VŠECHNY BARVY NAJEDNOU (S TLAČÍTKEM NA MÍCHÁNÍ) -->
         <div id="simultaneous-mode" class="mode-section">
             <div class="info-text">Rozsvítí se náhodně zamíchané barvy <b>současně</b>. Zapamatujte si jejich pořadí zezhora dolů!</div>
 
-            <!-- Dynamický semafor pro 3. režim -->
             <div class="traffic-light" id="sim-light-container">
-                <!-- Vykresluje se automaticky scriptem podle zamíchaného pořadí -->
+                <!-- Vykresluje se dynamicky scriptem -->
             </div>
 
             <div class="timer-bar-container" id="sim-timer-bar-box" style="display:none;">
@@ -427,7 +428,7 @@
             <div class="stats-display" id="sim-status">Připraveno</div>
 
             <div class="sequence-display-box" id="sim-sequence-preview">
-                <span style="color: var(--text-secondary); font-size: 0.85rem;">Stiskněte Start pro zahájení</span>
+                <span style="color: var(--text-secondary); font-size: 0.85rem;">Stiskněte Míchat nebo Start</span>
             </div>
 
             <div class="buttons-grid" id="sim-input-grid" style="display:none;">
@@ -457,8 +458,11 @@
                 </div>
             </div>
 
-            <div class="controls-row">
+            <div class="controls-row" id="sim-controls-row">
+                <button class="btn-action btn-shuffle" onclick="shuffleSimColorsManually()">🔀 Zamíchat barvy</button>
                 <button class="btn-action btn-primary" id="sim-start-btn" onclick="startSimGame()">Spustit test</button>
+            </div>
+            <div class="controls-row">
                 <button class="btn-action btn-secondary" id="sim-skip-btn" onclick="skipSimMemorization()" style="display:none;">Mám zapamatováno</button>
             </div>
         </div>
@@ -515,6 +519,10 @@
             document.getElementById('reaction-mode').classList.toggle('active', mode === 'reaction');
             document.getElementById('memory-mode').classList.toggle('active', mode === 'memory');
             document.getElementById('simultaneous-mode').classList.toggle('active', mode === 'simultaneous');
+
+            if (mode === 'simultaneous') {
+                prepareSimPreviewRound(); // Připravit náhled ihned po přepnutí
+            }
         }
 
         function clearLightDisplay(containerId) {
@@ -805,7 +813,7 @@
         }
 
 
-        // ================= REŽIM 3: VŠECHNY BARVY NAJEDNOU (DYNAMICKY ZAMÍCHANÉ) =================
+        // ================= REŽIM 3: VŠECHNY BARVY NAJEDNOU (S MÍCHÁNÍM) =================
         let simActive = false;
         let simTargetSequence = [];
         let simPlayerIndex = 0;
@@ -820,38 +828,14 @@
                 }
             });
             stopSimGame();
+            prepareSimPreviewRound();
         }
 
-        function startSimGame() {
-            stopSimGame();
-            simActive = true;
-            document.getElementById('sim-start-btn').textContent = 'Restartovat';
-            generateAndShowSimRound();
-        }
-
-        function stopSimGame() {
-            simActive = false;
-            clearInterval(simTimer);
-            document.getElementById('sim-light-containerinnerHTML') = '';
-            document.getElementById('sim-timer-bar-box').style.display = 'none';
-            document.getElementById('sim-input-grid').style.display = 'none';
-            document.getElementById('sim-skip-btn').style.display = 'none';
-            document.getElementById('sim-sequence-preview').style.display = 'flex';
-            document.getElementById('sim-sequence-preview').innerHTML = '<span style="color: var(--text-secondary); font-size: 0.85rem;">Stiskněte Start pro zahájení</span>';
-            document.getElementById('sim-status').textContent = 'Připraveno';
-            const btn = document.getElementById('sim-start-btn');
-            if(btn) btn.textContent = 'Spustit test';
-        }
-
-        function generateAndShowSimRound() {
-            if (!simActive) return;
-            simPlayerIndex = 0;
-            simTargetSequence = [];
-
-            const count = parseInt(document.getElementById('sim-count').value); // 4 nebo 6
+        function prepareSimPreviewRound() {
+            if (simActive) return;
+            const count = parseInt(document.getElementById('sim-count').value);
             const availableColors = count === 4 ? ['blue', 'yellow', 'red', 'green'] : ['blue', 'yellow', 'red', 'green', 'orange', 'purple'];
 
-            // Dokonale náhodné zamíchání (Fisher-Yates shuffle)
             let shuffled = [...availableColors];
             for (let i = shuffled.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -859,15 +843,51 @@
             }
             simTargetSequence = shuffled;
 
-            document.getElementById('sim-status').textContent = `Zapamatujte si ${count} náhodných barev!`;
+            // Zobrazit zamíchané barvy na semaforu (rozsvícené jako náhled před startem)
+            const container = document.getElementById('sim-light-container');
+            container.innerHTML = '';
+            simTargetSequence.forEach(color => {
+                const bulb = document.createElement('div');
+                bulb.className = `light-bulb active-${color}`;
+                bulb.setAttribute('data-color', color);
+                container.appendChild(bulb);
+            });
+
+            document.getElementById('sim-status').textContent = `Sestava připravena (${count} barev)`;
+            document.getElementById('sim-sequence-preview').innerHTML = `<span style="color:var(--text-secondary); font-size:0.85rem;">Stiskněte „Zamíchat barvy“ nebo „Spustit test“</span>`;
+        }
+
+        function shuffleSimColorsManually() {
+            if (simActive) return;
+            prepareSimPreviewRound();
+            playTone(500, 'sine', 0.1);
+        }
+
+        function startSimGame() {
+            stopSimGame();
+            simActive = true;
+            document.getElementById('sim-start-btn').textContent = 'Restartovat';
+            document.getElementById('sim-controls-row').style.display = 'none'; // Schovat míchací tlačítko během hry
             showSimMemorizationPhase();
+        }
+
+        function stopSimGame() {
+            simActive = false;
+            clearInterval(simTimer);
+            document.getElementById('sim-timer-bar-box').style.display = 'none';
+            document.getElementById('sim-input-grid').style.display = 'none';
+            document.getElementById('sim-skip-btn').style.display = 'none';
+            document.getElementById('sim-controls-row').style.display = 'flex';
+            const btn = document.getElementById('sim-start-btn');
+            if(btn) btn.textContent = 'Spustit test';
+            prepareSimPreviewRound();
         }
 
         function showSimMemorizationPhase() {
             const count = parseInt(document.getElementById('sim-count').value);
-            const durationMs = parseInt(document.getElementById('sim-time').value); // 6, 8 nebo 10 s
+            const durationMs = parseInt(document.getElementById('sim-time').value);
 
-            // DYNAMICKÉ VYKRESLENÍ SEMAFORU PODLE ZAMÍCHANÉHO POŘADÍ
+            // Znovu rozsvítit aktuální zamíchanou sekvenci
             const container = document.getElementById('sim-light-container');
             container.innerHTML = '';
             simTargetSequence.forEach(color => {
@@ -879,8 +899,7 @@
 
             playTone(400, 'sine', 0.4);
 
-            // Zobrazit přehledné tečky pro kontrolu
-            let previewHtml = '<div style="font-size:0.8rem; width:100%; text-align:center; color:var(--text-secondary); margin-bottom:4px;">Pořadí (shora dolů):</div><div class="seq-dots-row">';
+            let previewHtml = '<div style="font-size:0.8rem; width:100%; text-align:center; color:var(--text-secondary); margin-bottom:4px;">Zapamatujte si pořadí (shora dolů):</div><div class="seq-dots-row">';
             simTargetSequence.forEach(col => {
                 previewHtml += `<div class="seq-dot btn-${col}"></div>`;
             });
@@ -917,14 +936,13 @@
             document.getElementById('sim-timer-bar-box').style.display = 'none';
             document.getElementById('sim-skip-btn').style.display = 'none';
             
-            // SKRÝT BARVY NA SEMAFORU (zhasnout žárovky)
+            // Zhasnout barvy na semaforu
             const container = document.getElementById('sim-light-container');
             container.querySelectorAll('.light-bulb').forEach(bulb => {
                 bulb.className = 'light-bulb';
             });
 
             document.getElementById('sim-sequence-preview').innerHTML = `<span style="color:var(--accent); font-weight:bold;">Zadejte pořadí (${simPlayerIndex}/${simTargetSequence.length})</span>`;
-            
             document.getElementById('sim-input-grid').style.display = 'grid';
         }
 
@@ -932,7 +950,6 @@
             if (!simActive) return;
             playTone(getColorFreq(color), 'sine', 0.15);
             
-            // Krátce rozsvítit žárovku na semaforu na příslušné pozici, pokud tam barva patří
             const container = document.getElementById('sim-light-container');
             const bulb = container.querySelector(`[data-color="${color}"]`);
             if (bulb) {
@@ -948,13 +965,17 @@
                     playTone(650, 'triangle', 0.4);
                     document.getElementById('sim-status').innerHTML = `<span style="color:var(--success)">Skvěle zvládnuto! 🏆</span>`;
                     document.getElementById('sim-input-grid').style.display = 'none';
-                    setTimeout(generateAndShowSimRound, 2500);
+                    document.getElementById('sim-controls-row').style.display = 'flex';
+                    simActive = false;
+                    document.getElementById('sim-start-btn').textContent = 'Spustit další kolo';
+                    prepareSimPreviewRound();
                 }
             } else {
                 playTone(130, 'sawtooth', 0.4);
                 document.getElementById('sim-sequence-preview').innerHTML = `<span style="color:var(--danger); font-weight:bold;">Chyba v pořadí! Konec.</span>`;
                 document.getElementById('sim-status').innerHTML = `<span style="color:var(--danger)">Zkuste to znovu</span>`;
                 document.getElementById('sim-input-grid').style.display = 'none';
+                document.getElementById('sim-controls-row').style.display = 'flex';
                 simActive = false;
                 document.getElementById('sim-start-btn').textContent = 'Zkusit znovu';
             }
