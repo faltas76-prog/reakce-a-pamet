@@ -123,6 +123,8 @@
             box-shadow: inset 0 4px 10px rgba(0,0,0,0.6);
             width: 100%;
             max-width: 280px;
+            min-height: 140px;
+            justify-content: center;
         }
 
         .light-bulb {
@@ -132,11 +134,6 @@
             background: #1e293b;
             box-shadow: inset 0 4px 6px rgba(0,0,0,0.5);
             transition: transform 0.1s, box-shadow 0.2s, opacity 0.2s;
-        }
-
-        .light-bulb.hidden-bulb {
-            opacity: 0.15;
-            pointer-events: none;
         }
 
         .light-bulb.active-blue { background: var(--c-blue); box-shadow: 0 0 25px var(--c-blue), inset 0 2px 5px rgba(255,255,255,0.4); transform: scale(1.05); }
@@ -172,8 +169,7 @@
         }
 
         .color-btn.hidden-btn {
-            opacity: 0.2;
-            pointer-events: none;
+            display: none !important;
         }
 
         .color-btn:active {
@@ -415,17 +411,13 @@
             </div>
         </div>
 
-        <!-- REŽIM 3: PAMĚŤ – VŠECHNY BARVY NAJEDNOU (NÁHODNĚ ZAMÍCHANÉ) -->
+        <!-- REŽIM 3: PAMĚŤ – VŠECHNY BARVY NAJEDNOU (PLNĚ NÁHODNĚ ZAMÍCHANÉ) -->
         <div id="simultaneous-mode" class="mode-section">
             <div class="info-text">Rozsvítí se náhodně zamíchané barvy <b>současně</b>. Zapamatujte si jejich pořadí zezhora dolů!</div>
 
-            <div class="traffic-light" id="sim-light">
-                <div class="light-bulb" data-color="blue"></div>
-                <div class="light-bulb" data-color="yellow"></div>
-                <div class="light-bulb" data-color="red"></div>
-                <div class="light-bulb" data-color="green"></div>
-                <div class="light-bulb" data-color="orange" id="sim-bulb-orange"></div>
-                <div class="light-bulb" data-color="purple" id="sim-bulb-purple"></div>
+            <!-- Dynamický semafor pro 3. režim -->
+            <div class="traffic-light" id="sim-light-container">
+                <!-- Vykresluje se automaticky scriptem podle zamíchaného pořadí -->
             </div>
 
             <div class="timer-bar-container" id="sim-timer-bar-box" style="display:none;">
@@ -527,6 +519,7 @@
 
         function clearLightDisplay(containerId) {
             const container = document.getElementById(containerId);
+            if (!container) return;
             container.querySelectorAll('.light-bulb').forEach(bulb => {
                 bulb.className = 'light-bulb';
             });
@@ -535,6 +528,7 @@
         function activateBulb(containerId, color) {
             clearLightDisplay(containerId);
             const container = document.getElementById(containerId);
+            if (!container) return;
             const bulb = container.querySelector(`[data-color="${color}"]`);
             if (bulb) {
                 bulb.classList.add(`active-${color}`);
@@ -778,7 +772,9 @@
 
             ['orange', 'purple'].forEach(c => {
                 const btnElem = document.querySelector(`#memory-mode .color-btn.btn-${c}`);
-                if (btnElem) btnElem.style.display = (count === 4 ? 'none' : 'flex');
+                if (btnElem) {
+                    btnElem.classList.toggle('hidden-btn', count === 4);
+                }
             });
         }
 
@@ -809,7 +805,7 @@
         }
 
 
-        // ================= REŽIM 3: VŠECHNY BARVY NAJEDNOU (PLNĚ NÁHODNĚ ZAMÍCHANÉ) =================
+        // ================= REŽIM 3: VŠECHNY BARVY NAJEDNOU (DYNAMICKY ZAMÍCHANÉ) =================
         let simActive = false;
         let simTargetSequence = [];
         let simPlayerIndex = 0;
@@ -817,17 +813,12 @@
 
         function updateSimDifficulty() {
             const count = parseInt(document.getElementById('sim-count').value);
-            if (count === 4) {
-                document.getElementById('sim-bulb-orange').classList.add('hidden-bulb');
-                document.getElementById('sim-bulb-purple').classList.add('hidden-bulb');
-                document.getElementById('sim-btn-orange').classList.add('hidden-btn');
-                document.getElementById('sim-btn-purple').classList.add('hidden-btn');
-            } else {
-                document.getElementById('sim-bulb-orange').classList.remove('hidden-bulb');
-                document.getElementById('sim-bulb-purple').classList.remove('hidden-bulb');
-                document.getElementById('sim-btn-orange').classList.remove('hidden-btn');
-                document.getElementById('sim-btn-purple').classList.remove('hidden-btn');
-            }
+            ['orange', 'purple'].forEach(c => {
+                const btnElem = document.querySelector(`#simultaneous-mode .color-btn.btn-${c}`);
+                if (btnElem) {
+                    btnElem.classList.toggle('hidden-btn', count === 4);
+                }
+            });
             stopSimGame();
         }
 
@@ -841,7 +832,7 @@
         function stopSimGame() {
             simActive = false;
             clearInterval(simTimer);
-            clearLightDisplay('sim-light');
+            document.getElementById('sim-light-containerinnerHTML') = '';
             document.getElementById('sim-timer-bar-box').style.display = 'none';
             document.getElementById('sim-input-grid').style.display = 'none';
             document.getElementById('sim-skip-btn').style.display = 'none';
@@ -860,7 +851,7 @@
             const count = parseInt(document.getElementById('sim-count').value); // 4 nebo 6
             const availableColors = count === 4 ? ['blue', 'yellow', 'red', 'green'] : ['blue', 'yellow', 'red', 'green', 'orange', 'purple'];
 
-            // Dokonale náhodné zamíchání (Fisher-Yates shuffle algorithm)
+            // Dokonale náhodné zamíchání (Fisher-Yates shuffle)
             let shuffled = [...availableColors];
             for (let i = shuffled.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -876,15 +867,14 @@
             const count = parseInt(document.getElementById('sim-count').value);
             const durationMs = parseInt(document.getElementById('sim-time').value); // 6, 8 nebo 10 s
 
-            // Rozsvítit VŠECHNY vybrané barvy současně na semaforu
-            const container = document.getElementById('sim-light');
-            container.querySelectorAll('.light-bulb').forEach(bulb => {
-                const color = bulb.getAttribute('data-color');
-                if (simTargetSequence.includes(color)) {
-                    bulb.className = `light-bulb active-${color}`;
-                } else {
-                    bulb.className = 'light-bulb hidden-bulb';
-                }
+            // DYNAMICKÉ VYKRESLENÍ SEMAFORU PODLE ZAMÍCHANÉHO POŘADÍ
+            const container = document.getElementById('sim-light-container');
+            container.innerHTML = '';
+            simTargetSequence.forEach(color => {
+                const bulb = document.createElement('div');
+                bulb.className = `light-bulb active-${color}`;
+                bulb.setAttribute('data-color', color);
+                container.appendChild(bulb);
             });
 
             playTone(400, 'sine', 0.4);
@@ -927,28 +917,28 @@
             document.getElementById('sim-timer-bar-box').style.display = 'none';
             document.getElementById('sim-skip-btn').style.display = 'none';
             
-            // SKRÝT BARVY NA SEMAFORU
-            clearLightDisplay('sim-light');
-            const count = parseInt(document.getElementById('sim-count').value);
-            if (count === 4) {
-                document.getElementById('sim-bulb-orange').classList.add('hidden-bulb');
-                document.getElementById('sim-bulb-purple').classList.add('hidden-bulb');
-            }
+            // SKRÝT BARVY NA SEMAFORU (zhasnout žárovky)
+            const container = document.getElementById('sim-light-container');
+            container.querySelectorAll('.light-bulb').forEach(bulb => {
+                bulb.className = 'light-bulb';
+            });
 
             document.getElementById('sim-sequence-preview').innerHTML = `<span style="color:var(--accent); font-weight:bold;">Zadejte pořadí (${simPlayerIndex}/${simTargetSequence.length})</span>`;
             
             document.getElementById('sim-input-grid').style.display = 'grid';
-            ['orange', 'purple'].forEach(c => {
-                const btnElem = document.querySelector(`#simultaneous-mode .color-btn.btn-${c}`);
-                if (btnElem) btnElem.style.display = (count === 4 ? 'none' : 'flex');
-            });
         }
 
         function handleSimInput(color) {
             if (!simActive) return;
             playTone(getColorFreq(color), 'sine', 0.15);
-            activateBulb('sim-light', color);
-            setTimeout(() => clearLightDisplay('sim-light'), 250);
+            
+            // Krátce rozsvítit žárovku na semaforu na příslušné pozici, pokud tam barva patří
+            const container = document.getElementById('sim-light-container');
+            const bulb = container.querySelector(`[data-color="${color}"]`);
+            if (bulb) {
+                bulb.classList.add(`active-${color}`);
+                setTimeout(() => bulb.classList.remove(`active-${color}`), 250);
+            }
 
             if (color === simTargetSequence[simPlayerIndex]) {
                 simPlayerIndex++;
