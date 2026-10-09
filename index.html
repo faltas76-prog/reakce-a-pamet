@@ -360,9 +360,9 @@
             </div>
         </div>
 
-        <!-- REŽIM 2: PAMĚŤ (SEKVENCE + 10s + OBTÍŽNOST) -->
+        <!-- REŽIM 2: PAMĚŤ (NÁHODNÁ SEKVENCE 4 / 6 BAREV) -->
         <div id="memory-mode" class="mode-section">
-            <div class="info-text">Semafor ukáže sekvenci. Máte <b style="color:var(--accent)">10 vteřin</b> na zapamatování pořadí!</div>
+            <div class="info-text">Semafor rozsvítí vybraný počet barev za sebou. Máte <b style="color:var(--accent)">10 vteřin</b> na zapamatování pořadí!</div>
 
             <div class="traffic-light" id="memory-light">
                 <div class="light-bulb" data-color="blue"></div>
@@ -377,7 +377,7 @@
                 <div class="timer-bar" id="timer-bar"></div>
             </div>
 
-            <div class="stats-display" id="memory-status">Úroveň 1</div>
+            <div class="stats-display" id="memory-status">Připraveno</div>
 
             <!-- Zobrazení sekvence během fáze ukázky -->
             <div class="sequence-display-box" id="sequence-preview">
@@ -398,8 +398,8 @@
                 <div class="setting-item">
                     <span>Obtížnost paměti:</span>
                     <select id="memory-difficulty" onchange="updateMemoryDifficulty()">
-                        <option value="easy">Lehká (4 barvy: Modrá, Žlutá, Červená, Zelená)</option>
-                        <option value="hard">Těžká (Všech 6 barev vč. Oranžové a Fialové)</option>
+                        <option value="4">Lehká (Zapamatovat 4 barvy za sebou)</option>
+                        <option value="6">Těžká (Zapamatovat 6 barev za sebou)</option>
                     </select>
                 </div>
             </div>
@@ -414,7 +414,7 @@
 
     <script>
         const allColors = ['blue', 'yellow', 'red', 'green', 'orange', 'purple'];
-        let activeColors = ['blue', 'yellow', 'red', 'green']; // výchozí lehká
+        let activeColors = ['blue', 'yellow', 'red', 'green', 'orange', 'purple'];
 
         let audioCtx = null;
         function playTone(frequency, type = 'sine', duration = 0.15) {
@@ -515,7 +515,6 @@
             const submode = document.getElementById('reaction-submode').value;
 
             if (submode === 'falsestart') {
-                // Režim falešného startu: svítí červená (výzva ke klidu / připravenosti), po náhodné době 1.5 až 4 sekundy se rozsvítí zelená
                 isFalseStartWaiting = true;
                 currentReactionColor = null;
                 activateBulb('reaction-light', 'red');
@@ -559,12 +558,11 @@
 
             if (submode === 'falsestart') {
                 if (isFalseStartWaiting) {
-                    // Cvičenec kliknul moc brzy (falešný start!)
                     clearTimeout(reactionTimeout);
                     playTone(120, 'sawtooth', 0.4);
-                    document.getElementById('reaction-stats').innerHTML = `<span style="color:var(--danger)">UHLUL JSI! Falešný start (ukvapená reakce)!</span>`;
+                    document.getElementById('reaction-stats').innerHTML = `<span style="color:var(--danger)">UHLUL JSI! Falešný start!</span>`;
                     isFalseStartWaiting = false;
-                    setTimeout(nextReactionRound, 2000); // opakování kola
+                    setTimeout(nextReactionRound, 2000);
                     return;
                 }
                 
@@ -598,24 +596,22 @@
         }
 
 
-        // ================= TRÉNINK PAMĚTI (OBTÍŽNOST & 10s) =================
+        // ================= TRÉNINK PAMĚTI (NÁHODNÁ SEKVENCE 4 / 6) =================
         let memoryActive = false;
-        let memoryStage = 1;
         let targetSequence = [];
         let playerSequenceIndex = 0;
         let memorizationTimer = null;
         let remainingSeconds = 10;
+        let flashInterval = null;
 
         function updateMemoryDifficulty() {
-            const diff = document.getElementById('memory-difficulty').value;
-            if (diff === 'easy') {
-                activeColors = ['blue', 'yellow', 'red', 'green'];
+            const count = parseInt(document.getElementById('memory-difficulty').value);
+            if (count === 4) {
                 document.getElementById('mem-bulb-orange').classList.add('hidden-bulb');
                 document.getElementById('mem-bulb-purple').classList.add('hidden-bulb');
                 document.getElementById('mem-btn-orange').classList.add('hidden-btn');
                 document.getElementById('mem-btn-purple').classList.add('hidden-btn');
             } else {
-                activeColors = ['blue', 'yellow', 'red', 'green', 'orange', 'purple'];
                 document.getElementById('mem-bulb-orange').classList.remove('hidden-bulb');
                 document.getElementById('mem-bulb-purple').classList.remove('hidden-bulb');
                 document.getElementById('mem-btn-orange').classList.remove('hidden-btn');
@@ -627,14 +623,14 @@
         function startMemoryGame() {
             stopMemoryGame();
             memoryActive = true;
-            memoryStage = 1;
-            document.getElementById('memory-start-btn').textContent = 'Restartovat hru';
-            nextMemoryLevel();
+            document.getElementById('memory-start-btn').textContent = 'Restartovat';
+            generateAndShowMemorySequence();
         }
 
         function stopMemoryGame() {
             memoryActive = false;
             clearInterval(memorizationTimer);
+            clearInterval(flashInterval);
             clearLightDisplay('memory-light');
             document.getElementById('timer-bar-box').style.display = 'none';
             document.getElementById('memory-input-grid').style.display = 'none';
@@ -646,19 +642,20 @@
             if(btn) btn.textContent = 'Spustit paměť';
         }
 
-        function nextMemoryLevel() {
+        function generateAndShowMemorySequence() {
             if (!memoryActive) return;
             playerSequenceIndex = 0;
             targetSequence = [];
 
-            const seqLength = 2 + memoryStage; 
-            for (let i = 0; i < seqLength; i++) {
-                targetSequence.push(activeColors[Math.floor(Math.random() * activeColors.length)]);
+            const count = parseInt(document.getElementById('memory-difficulty').value); // 4 nebo 6
+            const availableColors = count === 4 ? ['blue', 'yellow', 'red', 'green'] : allColors;
+
+            // Náhodně vygenerujeme sekvenci o délce 4 nebo 6 barev za sebou
+            for (let i = 0; i < count; i++) {
+                targetSequence.push(availableColors[Math.floor(Math.random() * availableColors.length)]);
             }
 
-            const diffName = document.getElementById('memory-difficulty').value === 'easy' ? 'Lehká (4 barvy)' : 'Těžká (6 barev)';
-            document.getElementById('memory-status').textContent = `Úroveň ${memoryStage} (${diffName} | Délka: ${seqLength})`;
-            
+            document.getElementById('memory-status').textContent = `Zapamatuj si pořadí (${count} barev za sebou)`;
             showMemorizationPhase();
         }
 
@@ -668,16 +665,28 @@
             document.getElementById('memory-skip-btn').style.display = 'inline-block';
             document.getElementById('timer-bar-box').style.display = 'block';
             
-            let previewHtml = '<div style="font-size:0.85rem; width:100%; text-align:center; color:var(--text-secondary); margin-bottom:5px;">Zapamatuj si pořadí barev (10 sekund):</div><div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">';
+            // Vykreslit puntíky celé sekvence do boxu
+            let previewHtml = '<div style="font-size:0.85rem; width:100%; text-align:center; color:var(--text-secondary); margin-bottom:5px;">Správné pořadí za sebou:</div><div style="display:flex; gap:8px; justify-content:center; flex-wrap:wrap;">';
             targetSequence.forEach(col => {
                 previewHtml += `<div class="seq-dot btn-${col}"></div>`;
             });
             previewHtml += '</div>';
             document.getElementById('sequence-preview').innerHTML = previewHtml;
 
+            // Postupné přehrání/bliknutí sekvence na semaforu, aby cvičenci viděli, jak jdou po sobě
+            let seqIdx = 0;
             activateBulb('memory-light', targetSequence[0]);
             playTone(getColorFreq(targetSequence[0]), 'sine', 0.3);
 
+            clearInterval(flashInterval);
+            flashInterval = setInterval(() => {
+                if (!memoryActive) return;
+                seqIdx = (seqIdx + 1) % targetSequence.length;
+                activateBulb('memory-light', targetSequence[seqIdx]);
+                playTone(getColorFreq(targetSequence[seqIdx]), 'sine', 0.3);
+            }, 1200);
+
+            // Spuštění 10vteřinového odpočítávání
             remainingSeconds = 10;
             const timerBar = document.getElementById('timer-bar');
             timerBar.style.width = '100%';
@@ -694,6 +703,7 @@
 
                 if (timeLeft <= 0) {
                     clearInterval(memorizationTimer);
+                    clearInterval(flashInterval);
                     startPlayerInputPhase();
                 }
             }, 50);
@@ -701,6 +711,7 @@
 
         function skipMemorization() {
             clearInterval(memorizationTimer);
+            clearInterval(flashInterval);
             startPlayerInputPhase();
         }
 
@@ -710,16 +721,15 @@
             document.getElementById('memory-skip-btn').style.display = 'none';
             clearLightDisplay('memory-light');
 
-            document.getElementById('sequence-preview').innerHTML = `<span style="color:var(--accent); font-weight:bold;">Zadej správné pořadí (${playerSequenceIndex}/${targetSequence.length})</span>`;
+            document.getElementById('sequence-preview').innerHTML = `<span style="color:var(--accent); font-weight:bold;">Zadej barvy v přesném pořadí (${playerSequenceIndex}/${targetSequence.length})</span>`;
             
-            const diff = document.getElementById('memory-difficulty').value;
+            const count = parseInt(document.getElementById('memory-difficulty').value);
             document.getElementById('memory-input-grid').style.display = 'grid';
 
-            // Zobrazení/skrytí tlačítek podle zvolené obtížnosti v input fázi
             ['orange', 'purple'].forEach(c => {
                 const btnElem = document.querySelector(`.color-btn.btn-${c}`);
                 if (btnElem) {
-                    btnElem.style.display = (diff === 'easy' ? 'none' : 'flex');
+                    btnElem.style.display = (count === 4 ? 'none' : 'flex');
                 }
             });
         }
@@ -737,23 +747,22 @@
 
                 if (playerSequenceIndex === targetSequence.length) {
                     playTone(600, 'triangle', 0.4);
-                    document.getElementById('memory-status').innerHTML = `<span style="color:var(--success)">Úroveň ${memoryStage} splněna! 🏆</span>`;
+                    document.getElementById('memory-status').innerHTML = `<span style="color:var(--success)">Skvěle! Celá sekvence 🏆</span>`;
                     document.getElementById('memory-input-grid').style.display = 'none';
                     
-                    memoryStage++;
-                    setTimeout(nextMemoryLevel, 2000);
+                    // Po úspěchu vygeneruje novou náhodnou sekvenci pro další kolo
+                    setTimeout(generateAndShowMemorySequence, 2500);
                 }
             } else {
                 playTone(130, 'sawtooth', 0.4);
-                document.getElementById('sequence-preview').innerHTML = `<span style="color:var(--danger); font-weight:bold;">Chyba v pořadí! Konec hry.</span>`;
-                document.getElementById('memory-status').innerHTML = `<span style="color:var(--danger)">Dosažená úroveň: ${memoryStage}</span>`;
+                document.getElementById('sequence-preview').innerHTML = `<span style="color:var(--danger); font-weight:bold;">Chyba v pořadí! Konec.</span>`;
+                document.getElementById('memory-status').innerHTML = `<span style="color:var(--danger)">Zkuste to znovu</span>`;
                 document.getElementById('memory-input-grid').style.display = 'none';
                 memoryActive = false;
                 document.getElementById('memory-start-btn').textContent = 'Zkusit znovu';
             }
         }
 
-        // Inicializace výchozího stavu zobrazení barev
         updateMemoryDifficulty();
     </script>
 </body>
