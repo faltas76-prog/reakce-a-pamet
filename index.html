@@ -69,12 +69,12 @@
 
         .tab-btn {
             flex: 1;
-            padding: 10px 6px;
+            padding: 10px 4px;
             border: none;
             background: transparent;
             color: var(--text-secondary);
             font-weight: bold;
-            font-size: 0.82rem;
+            font-size: 0.8rem;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.2s;
@@ -243,7 +243,7 @@
         .stats-display {
             text-align: center;
             font-size: 1.15rem;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             font-weight: bold;
             min-height: 30px;
         }
@@ -258,16 +258,23 @@
 
         .sequence-display-box {
             display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
+            flex-direction: column;
+            gap: 6px;
             justify-content: center;
-            min-height: 55px;
-            padding: 10px;
+            min-height: 65px;
+            padding: 12px;
             background: #090d16;
             border-radius: 12px;
             margin-bottom: 15px;
             width: 100%;
             align-items: center;
+        }
+
+        .seq-dots-row {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            flex-wrap: wrap;
         }
 
         .seq-dot {
@@ -408,9 +415,9 @@
             </div>
         </div>
 
-        <!-- REŽIM 3: PAMĚŤ – VŠECHNY BARVY NAJEDNOU -->
+        <!-- REŽIM 3: PAMĚŤ – VŠECHNY BARVY NAJEDNOU (NÁHODNĚ ZAMÍCHANÉ) -->
         <div id="simultaneous-mode" class="mode-section">
-            <div class="info-text">Rozsvítí se 4 nebo 6 barev <b>současně</b>. Zapamatujte si jejich pořadí zezhora dolů!</div>
+            <div class="info-text">Rozsvítí se náhodně zamíchané barvy <b>současně</b>. Zapamatujte si jejich pořadí zezhora dolů!</div>
 
             <div class="traffic-light" id="sim-light">
                 <div class="light-bulb" data-color="blue"></div>
@@ -714,7 +721,7 @@
             document.getElementById('memory-skip-btn').style.display = 'inline-block';
             document.getElementById('timer-bar-box').style.display = 'block';
             
-            let previewHtml = '<div style="font-size:0.8rem; width:100%; text-align:center; color:var(--text-secondary); margin-bottom:4px;">Pořadí:</div><div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">';
+            let previewHtml = '<div style="font-size:0.8rem; width:100%; text-align:center; color:var(--text-secondary); margin-bottom:4px;">Pořadí:</div><div class="seq-dots-row">';
             targetSequence.forEach(col => {
                 previewHtml += `<div class="seq-dot btn-${col}"></div>`;
             });
@@ -764,7 +771,7 @@
             document.getElementById('memory-skip-btn').style.display = 'none';
             clearLightDisplay('memory-light');
 
-            document.getElementById('sequence-preview').innerHTML = `<span style="color:var(--accent); font-weight:bold;">Zadej pořadí (${playerSequenceIndex}/${targetSequence.length})</span>`;
+            document.getElementById('sequence-preview').innerHTML = `<span style="color:var(--accent); font-weight:bold;">Zadejte pořadí (${playerSequenceIndex}/${targetSequence.length})</span>`;
             
             const count = parseInt(document.getElementById('memory-difficulty').value);
             document.getElementById('memory-input-grid').style.display = 'grid';
@@ -802,7 +809,7 @@
         }
 
 
-        // ================= REŽIM 3: VŠECHNY BARVY NAJEDNOU =================
+        // ================= REŽIM 3: VŠECHNY BARVY NAJEDNOU (PLNĚ NÁHODNĚ ZAMÍCHANÉ) =================
         let simActive = false;
         let simTargetSequence = [];
         let simPlayerIndex = 0;
@@ -851,12 +858,17 @@
             simTargetSequence = [];
 
             const count = parseInt(document.getElementById('sim-count').value); // 4 nebo 6
-            const availableColors = count === 4 ? ['blue', 'yellow', 'red', 'green'] : [...allColors];
+            const availableColors = count === 4 ? ['blue', 'yellow', 'red', 'green'] : ['blue', 'yellow', 'red', 'green', 'orange', 'purple'];
 
-            // Náhodně zamíchat dostupné barvy, aby vytvořily pořadí
-            simTargetSequence = availableColors.sort(() => Math.random() - 0.5);
+            // Dokonale náhodné zamíchání (Fisher-Yates shuffle algorithm)
+            let shuffled = [...availableColors];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            simTargetSequence = shuffled;
 
-            document.getElementById('sim-status').textContent = `Zapamatujte si ${count} barev najednou!`;
+            document.getElementById('sim-status').textContent = `Zapamatujte si ${count} náhodných barev!`;
             showSimMemorizationPhase();
         }
 
@@ -875,11 +887,10 @@
                 }
             });
 
-            // Přehrát tón pro představu
             playTone(400, 'sine', 0.4);
 
-            // Zobrazit náhled (tečky) pro jistotu
-            let previewHtml = '<div style="font-size:0.8rem; width:100%; text-align:center; color:var(--text-secondary); margin-bottom:4px;">Správné pořadí (ze shora dolů):</div><div style="display:flex; gap:6px; justify-content:center; flex-wrap:wrap;">';
+            // Zobrazit přehledné tečky pro kontrolu
+            let previewHtml = '<div style="font-size:0.8rem; width:100%; text-align:center; color:var(--text-secondary); margin-bottom:4px;">Pořadí (shora dolů):</div><div class="seq-dots-row">';
             simTargetSequence.forEach(col => {
                 previewHtml += `<div class="seq-dot btn-${col}"></div>`;
             });
@@ -916,7 +927,7 @@
             document.getElementById('sim-timer-bar-box').style.display = 'none';
             document.getElementById('sim-skip-btn').style.display = 'none';
             
-            // SKRÝT BARVY NA SEMAFORU!
+            // SKRÝT BARVY NA SEMAFORU
             clearLightDisplay('sim-light');
             const count = parseInt(document.getElementById('sim-count').value);
             if (count === 4) {
@@ -924,7 +935,7 @@
                 document.getElementById('sim-bulb-purple').classList.add('hidden-bulb');
             }
 
-            document.getElementById('sim-sequence-preview').innerHTML = `<span style="color:var(--accent); font-weight:bold;">Zadejte barvy v pořadí (${simPlayerIndex}/${simTargetSequence.length})</span>`;
+            document.getElementById('sim-sequence-preview').innerHTML = `<span style="color:var(--accent); font-weight:bold;">Zadejte pořadí (${simPlayerIndex}/${simTargetSequence.length})</span>`;
             
             document.getElementById('sim-input-grid').style.display = 'grid';
             ['orange', 'purple'].forEach(c => {
